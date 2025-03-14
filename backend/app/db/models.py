@@ -11,7 +11,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY, TEXT
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import expression
 import datetime
 
@@ -63,7 +63,7 @@ class Task(Base):
     user = relationship("User", back_populates="tasks")
     children = relationship(
         "Task",
-        backref=relationship("Task", remote_side=[id]),
+        backref=backref("parent", remote_side=[id]),
         cascade="all, delete-orphan",
     )
     pomodoro_associations = relationship(

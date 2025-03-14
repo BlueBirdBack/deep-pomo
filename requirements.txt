@@ -12,10 +12,16 @@ anyio==4.8.0
     # via
     #   httpx
     #   starlette
+argon2-cffi==23.1.0
+    # via -r requirements.in
+argon2-cffi-bindings==21.2.0
+    # via argon2-cffi
 certifi==2025.1.31
     # via
     #   httpcore
     #   httpx
+cffi==1.17.1
+    # via argon2-cffi-bindings
 click==8.1.8
     # via uvicorn
 colorama==0.4.6
@@ -63,6 +69,8 @@ pyasn1==0.4.8
     # via
     #   python-jose
     #   rsa
+pycparser==2.22
+    # via cffi
 pydantic==2.10.6
     # via
     #   -r requirements.in

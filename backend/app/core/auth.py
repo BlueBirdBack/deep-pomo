@@ -10,7 +10,7 @@ from app.db.database import get_db
 from app.db.repositories.users import get_user_by_username
 from app.schemas.users import UserInDB, TokenData
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/token")
 
 
