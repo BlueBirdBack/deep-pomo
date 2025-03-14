@@ -1,3 +1,6 @@
+-- Enable LTREE extension for hierarchical data
+CREATE EXTENSION IF NOT EXISTS ltree;
+
 -- Users table
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
@@ -82,9 +85,6 @@ CREATE TABLE user_settings (
     notification_enabled BOOLEAN DEFAULT TRUE,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-
--- Enable LTREE extension for hierarchical data
-CREATE EXTENSION IF NOT EXISTS ltree;
 
 -- Indexes
 CREATE INDEX tasks_user_id_idx ON tasks(user_id);
@@ -262,6 +262,25 @@ BEGIN
                 VALUES(NEW.id, NEW.user_id, 'updated', changes);
             END IF;
         END IF;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to cascade soft deletes/restores from tasks to associations
+CREATE OR REPLACE FUNCTION cascade_task_soft_delete()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- When a task is soft-deleted, cascade soft-delete all its child tasks
+    IF NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL THEN
+        UPDATE tasks
+        SET deleted_at = NEW.deleted_at
+        WHERE path <@ OLD.path AND id != OLD.id AND deleted_at IS NULL;
+    -- When a task is restored, restore all its child tasks
+    ELSIF NEW.deleted_at IS NULL AND OLD.deleted_at IS NOT NULL THEN
+        UPDATE tasks
+        SET deleted_at = NULL
+        WHERE path <@ OLD.path AND id != OLD.id AND deleted_at = OLD.deleted_at;
     END IF;
     RETURN NULL;
 END;
