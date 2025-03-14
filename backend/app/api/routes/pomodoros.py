@@ -123,30 +123,29 @@ def delete_pomodoro(
 
 
 @router.post("/{pomodoro_id}/tasks", response_model=PomodoroTaskAssociation)
-def associate_task(
+def associate_task_with_pomodoro(
     pomodoro_id: int,
     association: PomodoroTaskAssociationCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Verify pomodoro exists and belongs to user
-    pomodoro = pomodoros_repository.get_pomodoro(db, pomodoro_id, current_user.id)
-    if not pomodoro:
+    # Ensure the provided pomodoro_id matches the one in the association data
+    if association.pomodoro_session_id != pomodoro_id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Pomodoro session not found"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pomodoro ID in path must match the one in request body",
         )
 
-    # Verify task exists and belongs to user
-    task = tasks_repository.get_task(db, association.task_id, current_user.id)
-    if not task:
+    result = pomodoros_repository.associate_task_with_pomodoro(
+        db, association, current_user.id
+    )
+    if not result:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pomodoro session or task not found",
         )
 
-    # Ensure the pomodoro_session_id in the request matches the URL
-    association.pomodoro_session_id = pomodoro_id
-
-    return pomodoros_repository.associate_task_with_pomodoro(db, association)
+    return result
 
 
 @router.get("/{pomodoro_id}/tasks", response_model=List[PomodoroTaskAssociation])

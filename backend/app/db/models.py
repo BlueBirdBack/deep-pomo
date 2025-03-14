@@ -9,7 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY, TEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import expression
@@ -50,9 +50,7 @@ class Task(Base):
         default="pending",
     )
     parent_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"))
-    path = Column(
-        String
-    )  # LTREE type in PostgreSQL, represented as String in SQLAlchemy
+    path = Column(String, index=True)  # PostgreSQL LTREE type
     color_code = Column(String(9))
     estimated_duration = Column(Integer)  # in seconds
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -164,3 +164,35 @@ def test_task_breadcrumb(authorized_client, db, test_user):
     assert data[0]["id"] == task1.id
     assert data[1]["id"] == task2.id
     assert data[2]["id"] == task3.id
+
+
+def test_task_hierarchy(authorized_client, test_user):
+    # Create parent task
+    parent_task_data = {
+        "title": "Parent Task",
+        "description": "This is a parent task",
+        "priority": "high",
+        "status": "pending",
+    }
+    parent_response = authorized_client.post("/api/v1/tasks/", json=parent_task_data)
+    parent_id = parent_response.json()["id"]
+
+    # Create child task
+    child_task_data = {
+        "title": "Child Task",
+        "description": "This is a child task",
+        "priority": "medium",
+        "status": "pending",
+        "parent_id": parent_id,
+    }
+    child_response = authorized_client.post("/api/v1/tasks/", json=child_task_data)
+    child_id = child_response.json()["id"]
+
+    # Get breadcrumb for child task
+    breadcrumb_response = authorized_client.get(f"/api/v1/tasks/{child_id}/breadcrumb")
+    assert breadcrumb_response.status_code == status.HTTP_200_OK
+
+    breadcrumb = breadcrumb_response.json()
+    assert len(breadcrumb) == 2
+    assert breadcrumb[0]["id"] == parent_id
+    assert breadcrumb[1]["id"] == child_id

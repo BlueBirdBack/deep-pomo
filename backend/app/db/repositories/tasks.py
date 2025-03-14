@@ -3,6 +3,7 @@ from sqlalchemy.sql import text
 from typing import List, Optional
 from app.schemas.tasks import TaskCreate, TaskUpdate
 from app.db.models import Task
+from sqlalchemy import func
 
 
 def create_task(db: Session, task: TaskCreate, user_id: int) -> Task:
@@ -87,23 +88,21 @@ def delete_task(
 
 
 def get_task_breadcrumb(db: Session, task_id: int, user_id: int):
-    """Get the breadcrumb path for a task using the custom function"""
-    result = db.execute(
-        text("SELECT * FROM get_task_breadcrumb(:task_id)"), {"task_id": task_id}
-    )
-    breadcrumb = [
-        {"id": row.id, "title": row.title, "level": row.level} for row in result
-    ]
-
-    # Verify user has access to this task
-    if (
-        breadcrumb
-        and db.query(Task).filter(Task.id == task_id, Task.user_id == user_id).first()
-        is None
-    ):
+    # Verify task exists and belongs to user
+    task = get_task(db, task_id, user_id)
+    if not task:
         return []
 
-    return breadcrumb
+    # Call the PostgreSQL function through SQLAlchemy
+    return (
+        db.query(Task.id, Task.title, func.nlevel(Task.path).label("level"))
+        .filter(
+            text(f"path @> (SELECT path FROM tasks WHERE id = {task_id})"),
+            Task.deleted_at.is_(None),
+        )
+        .order_by(Task.path)
+        .all()
+    )
 
 
 def get_task_children(db: Session, task_id: int, user_id: int):

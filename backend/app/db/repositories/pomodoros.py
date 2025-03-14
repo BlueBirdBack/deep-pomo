@@ -135,14 +135,32 @@ def delete_pomodoro(
 
 
 def associate_task_with_pomodoro(
-    db: Session, association: PomodoroTaskAssociationCreate
-) -> PomodoroTaskAssociation:
+    db: Session, association: PomodoroTaskAssociationCreate, user_id: int
+) -> Optional[PomodoroTaskAssociation]:
+    # Verify both pomodoro and task exist and belong to user
+    from app.db.models import Task
+
+    pomodoro = get_pomodoro(db, association.pomodoro_session_id, user_id)
+    task = (
+        db.query(Task)
+        .filter(
+            Task.id == association.task_id,
+            Task.user_id == user_id,
+            Task.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if not pomodoro or not task:
+        return None
+
     db_association = PomodoroTaskAssociation(
         pomodoro_session_id=association.pomodoro_session_id,
         task_id=association.task_id,
         time_spent=association.time_spent,
         notes=association.notes,
     )
+
     db.add(db_association)
     db.commit()
     db.refresh(db_association)

@@ -1,27 +1,30 @@
 import pytest
+import os
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 from app.db.database import Base, get_db
 from app.main import app
 from app.core.auth import get_password_hash
 from app.db.models import User, UserSettings
+from dotenv import load_dotenv
 
-# Use in-memory SQLite for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+# Load environment variables
+load_dotenv()
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
+# Use the test database URL from environment variables
+SQLALCHEMY_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost/deep_pomo_test"
 )
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 @pytest.fixture(scope="function")
 def db():
     # Create the database tables
+    Base.metadata.drop_all(bind=engine)  # Drop all tables to start with a clean slate
     Base.metadata.create_all(bind=engine)
 
     # Create a new session for each test
@@ -31,7 +34,7 @@ def db():
     finally:
         db.close()
 
-    # Drop all tables after the test
+    # Clean up after each test
     Base.metadata.drop_all(bind=engine)
 
 
