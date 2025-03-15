@@ -1,7 +1,9 @@
+"""Authentication routes"""
+
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from datetime import timedelta
 from app.db.database import get_db
 from app.core.auth import (
     authenticate_user,
@@ -18,6 +20,7 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    """Register a new user"""
     # Check if username already exists
     db_user = users_repository.get_user_by_username(db, user.username)
     if db_user:
@@ -46,6 +49,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
 ):
+    """Login for access token"""
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -64,4 +68,5 @@ def login_for_access_token(
 
 @router.get("/me", response_model=User)
 def read_users_me(current_user: User = Depends(get_current_user)):
+    """Get current user"""
     return current_user

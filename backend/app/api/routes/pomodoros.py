@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+"""Pomodoro session routes"""
+
 from typing import List, Optional
 from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.core.auth import get_current_user
 from app.schemas.pomodoros import (
@@ -24,6 +26,7 @@ def create_pomodoro(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Create a new pomodoro session"""
     return pomodoros_repository.create_pomodoro(db, pomodoro, current_user.id)
 
 
@@ -38,6 +41,7 @@ def read_pomodoros(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Get all pomodoro sessions"""
     return pomodoros_repository.get_pomodoros(
         db,
         user_id=current_user.id,
@@ -56,6 +60,7 @@ def read_pomodoro(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Get a specific pomodoro session"""
     pomodoro = pomodoros_repository.get_pomodoro(db, pomodoro_id, current_user.id)
     if not pomodoro:
         raise HTTPException(
@@ -86,6 +91,7 @@ def complete_pomodoro(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Complete a pomodoro session"""
     completed_pomodoro = pomodoros_repository.complete_pomodoro(
         db,
         pomodoro_id,
@@ -108,6 +114,7 @@ def delete_pomodoro(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Delete a pomodoro session"""
     success = pomodoros_repository.delete_pomodoro(
         db, pomodoro_id, current_user.id, soft_delete=not permanent
     )
@@ -125,6 +132,7 @@ def associate_task_with_pomodoro(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Associate a task with a pomodoro session"""
     # Ensure the provided pomodoro_id matches the one in the association data
     if association.pomodoro_session_id != pomodoro_id:
         raise HTTPException(
@@ -150,6 +158,7 @@ def get_pomodoro_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Get all tasks associated with a pomodoro session"""
     # Verify pomodoro exists and belongs to user
     pomodoro = pomodoros_repository.get_pomodoro(db, pomodoro_id, current_user.id)
     if not pomodoro:
@@ -166,6 +175,7 @@ def get_task_pomodoros(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Get all pomodoro sessions associated with a task"""
     # Verify task exists and belongs to user
     task = tasks_repository.get_task(db, task_id, current_user.id)
     if not task:

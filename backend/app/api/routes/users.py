@@ -1,3 +1,5 @@
+"""User routes"""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.database import get_db
@@ -13,6 +15,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 def read_user_settings(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
+    """Get user settings"""
     settings = users_repository.get_user_settings(db, current_user.id)
     if not settings:
         raise HTTPException(
@@ -27,6 +30,7 @@ def update_user_settings(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Update user settings"""
     settings = users_repository.update_user_settings(
         db, current_user.id, settings_update.model_dump(exclude_unset=True)
     )
@@ -43,6 +47,7 @@ def update_user_me(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Update current user"""
     # Check if username is being updated and is already taken
     if user_update.username and user_update.username != current_user.username:
         db_user = users_repository.get_user_by_username(db, user_update.username)

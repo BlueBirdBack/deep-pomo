@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+"""Task routes"""
+
 from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.core.auth import get_current_user
 from app.schemas.tasks import (
     Task,
     TaskCreate,
-    TaskUpdate,
     TaskBreadcrumb,
     TaskWithChildren,
     TaskHistory,
@@ -24,6 +25,7 @@ def create_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Create a new task"""
     # If parent_id is provided, verify it exists and belongs to the user
     if task.parent_id:
         parent_task = tasks_repository.get_task(db, task.parent_id, current_user.id)
@@ -44,6 +46,7 @@ def read_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Get all tasks"""
     return tasks_repository.get_tasks(
         db,
         user_id=current_user.id,
@@ -60,6 +63,7 @@ def read_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Get a specific task"""
     task = tasks_repository.get_task(db, task_id, current_user.id)
     if not task:
         raise HTTPException(
@@ -97,6 +101,7 @@ def delete_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Delete a task"""
     success = tasks_repository.delete_task(
         db, task_id, current_user.id, soft_delete=not permanent
     )
@@ -113,6 +118,7 @@ def get_task_breadcrumb(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Get the breadcrumb for a task"""
     task = tasks_repository.get_task(db, task_id, current_user.id)
     if not task:
         raise HTTPException(
@@ -128,6 +134,7 @@ def get_task_children(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Get the children of a task"""
     task = tasks_repository.get_task(db, task_id, current_user.id)
     if not task:
         raise HTTPException(
@@ -171,11 +178,14 @@ def get_task_with_children(
 
     # Build hierarchical structure
     # This is a simplified approach - for a real app, you might want a more efficient algorithm
+    children_list = []
     for child in children:
         if child["level"] == 1:  # Direct children
-            task_dict["children"].append(
+            children_list.append(
                 {"id": child["id"], "title": child["title"], "children": []}
             )
+
+    task_dict["children"] = children_list
 
     return task_dict
 
@@ -227,7 +237,7 @@ def update_task_partial(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Circular reference detected in task hierarchy",
-            )
+            ) from e
         # Re-raise other exceptions
         raise
 
