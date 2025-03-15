@@ -335,9 +335,9 @@ CREATE OR REPLACE FUNCTION get_task_children(task_id INTEGER)
 RETURNS TABLE(id INTEGER, title VARCHAR, level INTEGER) AS $$
 BEGIN
    RETURN QUERY
-   SELECT t.id, t.title, nlevel(t.path) - (SELECT nlevel(path) FROM tasks WHERE id = task_id) as level
+   SELECT t.id, t.title, nlevel(t.path) - (SELECT nlevel(path) FROM tasks WHERE tasks.id = task_id) as level
    FROM tasks t
-   WHERE t.path <@ (SELECT path FROM tasks WHERE id = task_id)
+   WHERE t.path <@ (SELECT path FROM tasks WHERE tasks.id = task_id)
       AND t.id <> task_id  -- Exclude the parent task itself
       AND t.deleted_at IS NULL
    ORDER BY t.path;

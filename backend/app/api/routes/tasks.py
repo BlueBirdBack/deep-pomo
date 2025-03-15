@@ -214,11 +214,22 @@ def update_task_partial(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
 
-    # Update the task
-    updated_task = tasks_repository.update_task(
-        db, task_id, current_user.id, task_update.model_dump(exclude_unset=True)
-    )
-    return updated_task
+    try:
+        # Update the task
+        updated_task = tasks_repository.update_task(
+            db, task_id, current_user.id, task_update.model_dump(exclude_unset=True)
+        )
+        return updated_task
+    except Exception as e:
+        # Check if this is a circular reference error
+        error_str = str(e).lower()
+        if "circular reference" in error_str:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Circular reference detected in task hierarchy",
+            )
+        # Re-raise other exceptions
+        raise
 
 
 @router.post("/{task_id}/restore", response_model=schemas.Task)
