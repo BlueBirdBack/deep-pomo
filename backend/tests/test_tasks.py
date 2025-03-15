@@ -193,7 +193,7 @@ def test_task_breadcrumb(authorized_client, db, test_user):
 
 
 @pytest.mark.tasks
-def test_task_hierarchy(authorized_client, test_user):
+def test_task_hierarchy(authorized_client):
     """Test creating a task hierarchy"""
 
     # Create parent task
@@ -225,3 +225,23 @@ def test_task_hierarchy(authorized_client, test_user):
     assert len(breadcrumb) == 2
     assert breadcrumb[0]["id"] == parent_id
     assert breadcrumb[1]["id"] == child_id
+
+
+@pytest.mark.tasks
+def test_task_status_constraint(authorized_client):
+    """Test that invalid task status values are rejected"""
+    # Try to create a task with an invalid status
+    task_data = {
+        "title": "Invalid Status Task",
+        "status": "invalid_status",  # Not in the allowed values
+    }
+
+    response = authorized_client.post("/api/v1/tasks/", json=task_data)
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    # Verify the error message mentions status
+    error_detail = response.json()["detail"]
+    status_error = next(
+        (error for error in error_detail if "status" in error["loc"]), None
+    )
+    assert status_error is not None

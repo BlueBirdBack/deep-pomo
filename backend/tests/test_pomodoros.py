@@ -1,6 +1,6 @@
 import pytest
 from fastapi import status
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from app.db.models import PomodoroSession, Task, PomodoroTaskAssociation
 
 
@@ -197,3 +197,40 @@ def test_delete_pomodoro(authorized_client, db, test_user):
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert len(data) == 0
+
+
+@pytest.mark.pomodoro
+def test_pomodoro_interruption(authorized_client, db, test_user):
+    """Test recording an interruption for a pomodoro session"""
+    # Create a pomodoro session
+    session_data = {
+        "start_time": datetime.now(UTC).isoformat(),
+        "duration": 1500,  # 25 minutes
+        "session_type": "work",
+    }
+
+    response = authorized_client.post("/api/v1/pomodoros/", json=session_data)
+    assert response.status_code == status.HTTP_201_CREATED
+    session_id = response.json()["id"]
+
+    # Update with interruption
+    interruption_data = {
+        "end_time": datetime.now(UTC).isoformat(),
+        "actual_duration": 600,  # 10 minutes (interrupted early)
+        "completed": False,
+        "interruption_reason": "Unexpected phone call",
+    }
+
+    response = authorized_client.patch(
+        f"/api/v1/pomodoros/{session_id}", json=interruption_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    # Verify the interruption was recorded
+    response = authorized_client.get(f"/api/v1/pomodoros/{session_id}")
+    assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
+    assert data["completed"] == False
+    assert data["interruption_reason"] == "Unexpected phone call"
+    assert data["actual_duration"] == 600

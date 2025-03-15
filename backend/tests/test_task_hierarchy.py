@@ -1,6 +1,5 @@
 import pytest
 from fastapi import status
-from datetime import datetime
 from app.db.models import Task
 
 
@@ -109,3 +108,44 @@ def test_prevent_circular_references(authorized_client, test_user):
     # Should fail with a 400 error
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "circular reference" in response.json()["detail"].lower()
+
+
+@pytest.mark.tasks
+def test_ltree_path_update_on_reparenting(authorized_client, db, test_user):
+    """Test that LTREE paths are correctly updated when a task is moved to a new parent"""
+    # Create a top-level task A
+    task_a_data = {"title": "Task A", "status": "pending"}
+    response = authorized_client.post("/api/v1/tasks/", json=task_a_data)
+    task_a_id = response.json()["id"]
+
+    # Create task B as child of A
+    task_b_data = {"title": "Task B", "status": "pending", "parent_id": task_a_id}
+    response = authorized_client.post("/api/v1/tasks/", json=task_b_data)
+    task_b_id = response.json()["id"]
+
+    # Create task C as child of B
+    task_c_data = {"title": "Task C", "status": "pending", "parent_id": task_b_id}
+    response = authorized_client.post("/api/v1/tasks/", json=task_c_data)
+    task_c_id = response.json()["id"]
+
+    # Verify initial paths
+    task_a = db.query(Task).filter(Task.id == task_a_id).first()
+    task_b = db.query(Task).filter(Task.id == task_b_id).first()
+    task_c = db.query(Task).filter(Task.id == task_c_id).first()
+
+    assert task_a.path == str(task_a_id)
+    assert task_b.path == f"{task_a_id}.{task_b_id}"
+    assert task_c.path == f"{task_a_id}.{task_b_id}.{task_c_id}"
+
+    # Now move B to be a top-level task (no parent)
+    update_data = {"parent_id": None}
+    response = authorized_client.patch(f"/api/v1/tasks/{task_b_id}", json=update_data)
+    assert response.status_code == status.HTTP_200_OK
+
+    # Refresh from database
+    db.refresh(task_b)
+    db.refresh(task_c)
+
+    # Verify paths were updated correctly
+    assert task_b.path == str(task_b_id)
+    assert task_c.path == f"{task_b_id}.{task_c_id}"

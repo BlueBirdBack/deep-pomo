@@ -42,3 +42,21 @@ def test_update_user_settings(authorized_client, test_user):
     assert data["pomodoro_duration"] == settings_data["pomodoro_duration"]
     assert data["theme"] == settings_data["theme"]
     assert data["user_id"] == test_user.id
+
+
+@pytest.mark.users
+def test_user_settings_defaults(authorized_client, db, test_user):
+    """Test that user settings have correct default values from schema"""
+    # Get user settings without modifying them first
+    response = authorized_client.get("/api/v1/users/me/settings")
+    assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
+
+    # Verify defaults match schema.sql definitions
+    assert data["pomodoro_duration"] == 1500  # 25 minutes in seconds
+    assert data["short_break_duration"] == 300  # 5 minutes
+    assert data["long_break_duration"] == 900  # 15 minutes
+    assert data["pomodoros_until_long_break"] == 4
+    assert data["theme"] == "light"
+    assert data["notification_enabled"] is True
