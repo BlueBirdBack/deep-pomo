@@ -102,6 +102,8 @@ sqlalchemy==2.0.39
     #   alembic
 starlette==0.46.1
     # via fastapi
+types-psycopg2==2.9.21.20250121
+    # via -r requirements.in
 typing-extensions==4.12.2
     # via
     #   alembic

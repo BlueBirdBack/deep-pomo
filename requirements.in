@@ -13,3 +13,4 @@ httpx
 python-dotenv
 email-validator
 argon2-cffi
+types-psycopg2
