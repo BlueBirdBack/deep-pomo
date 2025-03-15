@@ -2,6 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS ltree;
 
 -- Users table
+-- Test coverage: test_users.py, test_auth.py
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
@@ -11,6 +12,7 @@ CREATE TABLE users (
 );
 
 -- Tasks table - supports hierarchical structure
+-- Test coverage: test_tasks.py, test_task_hierarchy.py, test_task_breadcrumbs.py, test_soft_delete.py
 CREATE TABLE tasks (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -30,6 +32,7 @@ CREATE TABLE tasks (
 );
 
 -- Pomodoro sessions table
+-- Test coverage: test_pomodoros.py
 CREATE TABLE pomodoro_sessions (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -46,6 +49,7 @@ CREATE TABLE pomodoro_sessions (
 );
 
 -- Pomodoro-task association table - implements decoupling
+-- Test coverage: test_pomodoros.py
 CREATE TABLE pomodoro_task_associations (
     id SERIAL PRIMARY KEY,
     pomodoro_session_id INTEGER NOT NULL REFERENCES pomodoro_sessions(id) ON DELETE CASCADE,
@@ -57,6 +61,7 @@ CREATE TABLE pomodoro_task_associations (
 );
 
 -- Create ENUM type for task actions
+-- Test coverage: test_task_history.py
 CREATE TYPE task_action AS ENUM (
     'created', 
     'updated',
@@ -65,6 +70,7 @@ CREATE TYPE task_action AS ENUM (
 );
 
 -- Task history table - for visual history feature
+-- Test coverage: test_task_history.py
 CREATE TABLE task_history (
     id SERIAL PRIMARY KEY,
     task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -75,6 +81,7 @@ CREATE TABLE task_history (
 );
 
 -- User settings table
+-- Test coverage: test_users.py
 CREATE TABLE user_settings (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     pomodoro_duration INTEGER DEFAULT 1500, -- 25 minutes in seconds
@@ -110,6 +117,7 @@ CREATE INDEX pomodoro_task_assoc_not_deleted_idx ON pomodoro_task_associations(p
     WHERE deleted_at IS NULL;
 
 -- Trigger to update the updated_at timestamp
+-- Test coverage: Implicit in all update tests
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -124,6 +132,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_updated_at();
 
 -- Trigger to update task path using LTREE with circular reference check
+-- Test coverage: test_task_hierarchy.py
 CREATE OR REPLACE FUNCTION update_task_path()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -154,6 +163,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_task_path();
 
 -- Trigger to update task path when parent_id changes with circular reference check
+-- Test coverage: test_task_hierarchy.py - test_ltree_path_update_on_reparenting
 CREATE OR REPLACE FUNCTION update_task_path_on_parent_change()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -202,6 +212,7 @@ WHEN (OLD.parent_id IS DISTINCT FROM NEW.parent_id)
 EXECUTE FUNCTION update_task_path_on_parent_change();
 
 -- Trigger to update completed_at when status changes to/from 'completed'
+-- Test coverage: Needs explicit test - see recommended task_completion test
 CREATE OR REPLACE FUNCTION update_task_completed_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -221,6 +232,7 @@ WHEN (NEW.status IS DISTINCT FROM OLD.status)
 EXECUTE FUNCTION update_task_completed_at();
 
 -- Trigger to log task history using JSONB
+-- Test coverage: test_task_history.py
 CREATE OR REPLACE FUNCTION log_task_history()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -268,6 +280,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger to cascade soft deletes/restores from tasks to associations
+-- Test coverage: test_soft_delete.py - test_hierarchical_soft_delete_cascade
 CREATE OR REPLACE FUNCTION cascade_task_soft_delete()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -293,6 +306,7 @@ WHEN (OLD.deleted_at IS DISTINCT FROM NEW.deleted_at)
 EXECUTE FUNCTION cascade_task_soft_delete();
 
 -- Improved trigger for cascading soft deletes/restores from pomodoro sessions to associations
+-- Test coverage: test_pomodoros.py - test_pomodoro_soft_delete_cascade
 CREATE OR REPLACE FUNCTION cascade_pomodoro_soft_delete()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -318,6 +332,7 @@ WHEN (OLD.deleted_at IS DISTINCT FROM NEW.deleted_at)
 EXECUTE FUNCTION cascade_pomodoro_soft_delete();
 
 -- Improved function to get task breadcrumb using LTREE
+-- Test coverage: test_task_breadcrumbs.py
 CREATE OR REPLACE FUNCTION get_task_breadcrumb(task_id INTEGER)
 RETURNS TABLE(id INTEGER, title VARCHAR, level INTEGER) AS $$
 BEGIN
@@ -331,6 +346,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Improved function to get all children of a task using LTREE
+-- Test coverage: test_task_hierarchy.py
 CREATE OR REPLACE FUNCTION get_task_children(task_id INTEGER)
 RETURNS TABLE(id INTEGER, title VARCHAR, level INTEGER) AS $$
 BEGIN
@@ -345,6 +361,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Improved function to check if a task is a descendant of another task
+-- Test coverage: test_task_hierarchy.py
 CREATE OR REPLACE FUNCTION is_descendant(potential_descendant_id INTEGER, ancestor_id INTEGER)
 RETURNS BOOLEAN AS $$
 DECLARE
