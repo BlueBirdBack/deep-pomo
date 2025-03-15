@@ -231,6 +231,109 @@ def test_pomodoro_interruption(authorized_client, db, test_user):
     assert response.status_code == status.HTTP_200_OK
 
     data = response.json()
-    assert data["completed"] == False
+    assert data["completed"] is False
     assert data["interruption_reason"] == "Unexpected phone call"
     assert data["actual_duration"] == 600
+
+
+def test_pomodoro_soft_delete_cascade(authorized_client, db, test_user):
+    """Test soft deleting a pomodoro session cascades to associations"""
+    # Create a pomodoro session
+    pomodoro_data = {
+        "start_time": datetime.utcnow().isoformat(),
+        "duration": 1500,
+        "session_type": "work",
+        "completed": False,
+    }
+    pomodoro_response = authorized_client.post("/api/v1/pomodoros/", json=pomodoro_data)
+    assert pomodoro_response.status_code == status.HTTP_201_CREATED
+    pomodoro_id = pomodoro_response.json()["id"]
+
+    # Create a task
+    task_data = {"title": "Test Task", "status": "pending"}
+    task_response = authorized_client.post("/api/v1/tasks/", json=task_data)
+    assert task_response.status_code == status.HTTP_201_CREATED
+    task_id = task_response.json()["id"]
+
+    # Associate the task with the pomodoro
+    association_data = {
+        "pomodoro_session_id": pomodoro_id,
+        "task_id": task_id,
+        "time_spent": 900,
+    }
+    db.add(PomodoroTaskAssociation(**association_data))
+    db.commit()
+
+    # Soft delete the pomodoro session
+    response = authorized_client.delete(f"/api/v1/pomodoros/{pomodoro_id}")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    # Verify pomodoro is soft deleted
+    pomodoro = (
+        db.query(PomodoroSession).filter(PomodoroSession.id == pomodoro_id).first()
+    )
+    assert pomodoro.deleted_at is not None
+
+    # Verify association is also soft deleted
+    association = (
+        db.query(PomodoroTaskAssociation)
+        .filter(
+            PomodoroTaskAssociation.pomodoro_session_id == pomodoro_id,
+            PomodoroTaskAssociation.task_id == task_id,
+        )
+        .first()
+    )
+    assert association.deleted_at is not None
+    assert association.deleted_at == pomodoro.deleted_at  # Same timestamp
+
+
+def test_pomodoro_restoration_cascade(authorized_client, db, test_user):
+    """Test restoring a pomodoro session cascades to associations"""
+    # Create a pomodoro session
+    pomodoro = PomodoroSession(
+        user_id=test_user.id,
+        start_time=datetime.utcnow(),
+        duration=1500,
+        session_type="work",
+        completed=False,
+    )
+    db.add(pomodoro)
+    db.commit()
+    db.refresh(pomodoro)
+
+    # Create a task
+    task = Task(user_id=test_user.id, title="Test Task", status="pending")
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+
+    # Associate the task with the pomodoro
+    association = PomodoroTaskAssociation(
+        pomodoro_session_id=pomodoro.id, task_id=task.id, time_spent=900
+    )
+    db.add(association)
+    db.commit()
+    db.refresh(association)
+
+    # Soft delete the pomodoro
+    pomodoro.deleted_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(association)
+
+    # Verify association is soft deleted
+    assert association.deleted_at is not None
+
+    # Restore the pomodoro
+    pomodoro.deleted_at = None
+    db.commit()
+    db.refresh(association)
+
+    # Verify association is also restored
+    assert association.deleted_at is None
+
+    # Pomodoro should appear in list
+    response = authorized_client.get("/api/v1/pomodoros/")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == pomodoro.id
