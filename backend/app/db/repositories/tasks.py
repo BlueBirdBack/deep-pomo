@@ -79,17 +79,51 @@ def get_tasks(
 def update_task(
     db: Session, task_id: int, user_id: int, task_update: dict
 ) -> Optional[Task]:
+    """Update a task with the given fields"""
+    # First get the task to ensure it exists and belongs to the user
     db_task = get_task(db, task_id, user_id)
     if not db_task:
         return None
 
     # Record old values for history
     changes = {}
+
+    # Update task fields
     for key, new_value in task_update.items():
         old_value = getattr(db_task, key)
         if old_value != new_value:  # Only record if value actually changed
             changes[key] = {"old": old_value, "new": new_value}
             setattr(db_task, key, new_value)
+
+    # Handle completed_at field based on status changes
+    if "status" in changes:
+        from datetime import datetime, UTC
+
+        # If status changed to completed, set completed_at
+        if changes["status"]["new"] == "completed" and db_task.completed_at is None:
+            completed_at = datetime.now(UTC)
+            db_task.completed_at = completed_at
+            changes["completed_at"] = {
+                "old": None,
+                "new": completed_at.isoformat() if completed_at else None,
+            }
+            # Ensure the change is committed to the database immediately
+            db.flush()
+
+        # If status changed from completed to something else, reset completed_at
+        elif (
+            changes["status"]["old"] == "completed"
+            and changes["status"]["new"] != "completed"
+        ):
+            changes["completed_at"] = {
+                "old": (
+                    db_task.completed_at.isoformat() if db_task.completed_at else None
+                ),
+                "new": None,
+            }
+            db_task.completed_at = None
+            # Ensure the change is committed to the database immediately
+            db.flush()
 
     # Only create history entry if there were actual changes
     if changes:
