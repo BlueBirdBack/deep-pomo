@@ -187,7 +187,7 @@ def get_task_breadcrumb(db: Session, task_id: int, user_id: int):
 
     # Call the PostgreSQL function through SQLAlchemy
     return (
-        db.query(Task.id, Task.title, func.nlevel(Task.path).label("level"))
+        db.query(Task.id, Task.title, (func.nlevel(Task.path) - 1).label("level"))
         .filter(
             text(f"path @> (SELECT path FROM tasks WHERE id = {task_id})"),
             Task.deleted_at.is_(None),

@@ -1,7 +1,10 @@
+"""Test retrieving breadcrumb navigation for a task"""
+
 import pytest
 from fastapi import status
 
 
+@pytest.mark.tasks
 def test_get_task_breadcrumb(authorized_client, test_user, db):
     """Test retrieving breadcrumb navigation for a task"""
     # Create a hierarchy: Task A -> Task B -> Task C
@@ -16,6 +19,17 @@ def test_get_task_breadcrumb(authorized_client, test_user, db):
     task_c_data = {"title": "Task C", "status": "pending", "parent_id": task_b_id}
     task_c_response = authorized_client.post("/api/v1/tasks/", json=task_c_data)
     task_c_id = task_c_response.json()["id"]
+
+    # Verify tasks were created with correct user_id
+    from app.db.models import Task
+
+    tasks = db.query(Task).filter(Task.user_id == test_user.id).all()
+    assert len(tasks) == 3
+
+    # Verify task hierarchy in database
+    task_c = db.query(Task).filter(Task.id == task_c_id).first()
+    assert task_c.user_id == test_user.id
+    assert task_c.parent_id == task_b_id
 
     # Get breadcrumb for Task C
     response = authorized_client.get(f"/api/v1/tasks/{task_c_id}/breadcrumb")
