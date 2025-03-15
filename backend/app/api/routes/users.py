@@ -28,7 +28,7 @@ def update_user_settings(
     db: Session = Depends(get_db),
 ):
     settings = users_repository.update_user_settings(
-        db, current_user.id, settings_update.dict(exclude_unset=True)
+        db, current_user.id, settings_update.model_dump(exclude_unset=True)
     )
     if not settings:
         raise HTTPException(
