@@ -30,24 +30,21 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 # ---- Database Cleaning Functions ----
 def clean_database(db_session):
-    """Clean all tables in the database"""
+    """Clean all tables in the database without requiring superuser privileges"""
     try:
-        # Disable foreign key checks temporarily
-        db_session.execute(text("SET session_replication_role = 'replica';"))
-
-        # Truncate all tables
+        # Use TRUNCATE with CASCADE to efficiently clean all tables
         db_session.execute(
             text(
                 """
-            TRUNCATE users, tasks, pomodoro_sessions, pomodoro_task_associations,
-            task_history, user_settings RESTART IDENTITY CASCADE;
-        """
+                TRUNCATE users, tasks, pomodoro_sessions, pomodoro_task_associations,
+                task_history, user_settings RESTART IDENTITY CASCADE;
+                """
             )
         )
-
-        # Re-enable foreign key checks
-        db_session.execute(text("SET session_replication_role = 'origin';"))
         db_session.commit()
+    except Exception as e:
+        print(f"Error cleaning database: {e}")
+        db_session.rollback()
     finally:
         db_session.close()
 

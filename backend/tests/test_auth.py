@@ -2,6 +2,7 @@ import pytest
 from fastapi import status
 from dotenv import load_dotenv
 import os
+from sqlalchemy import text
 
 # Load test environment variables
 load_dotenv(".env.test")
@@ -16,6 +17,11 @@ def test_register_user(client):
     }
 
     response = client.post("/api/v1/auth/register", json=user_data)
+    # Debug the response if it fails
+    if response.status_code != status.HTTP_201_CREATED:
+        print(f"Registration failed with status {response.status_code}")
+        print(f"Response body: {response.json()}")
+
     assert response.status_code == status.HTTP_201_CREATED
 
     data = response.json()

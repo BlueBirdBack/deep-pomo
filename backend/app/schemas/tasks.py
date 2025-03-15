@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Union
 from datetime import datetime
 
@@ -38,8 +38,7 @@ class Task(TaskBase):
     updated_at: datetime
     completed_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TaskBreadcrumb(BaseModel):
@@ -58,5 +57,4 @@ class TaskWithChildren(Task):
     children: List[TaskChild] = []
 
 
-# Resolve forward references
-TaskChild.update_forward_refs()
+TaskChild.model_rebuild()

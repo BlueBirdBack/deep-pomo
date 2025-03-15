@@ -10,8 +10,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY, TEXT
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship, backref, declarative_base
 from sqlalchemy.sql import expression
 import datetime
 
