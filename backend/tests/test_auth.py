@@ -1,15 +1,17 @@
+"""Test authentication endpoints"""
+
 import pytest
 from fastapi import status
 from dotenv import load_dotenv
-import os
-from sqlalchemy import text
 
 # Load test environment variables
 load_dotenv(".env.test")
 
 
+@pytest.mark.auth
 def test_register_user(client):
-    # Test user registration
+    """Test user registration"""
+
     user_data = {
         "username": "newuser",
         "email": "newuser@example.com",
@@ -31,7 +33,8 @@ def test_register_user(client):
 
 
 def test_login(client, test_user):
-    # Test login
+    """Test user login"""
+
     login_data = {"username": test_user.username, "password": "password123"}
 
     response = client.post("/api/v1/auth/token", data=login_data)
@@ -43,7 +46,8 @@ def test_login(client, test_user):
 
 
 def test_login_invalid_credentials(client, test_user):
-    # Test login with invalid credentials
+    """Test user login with invalid credentials"""
+
     login_data = {"username": test_user.username, "password": "wrongpassword"}
 
     response = client.post("/api/v1/auth/token", data=login_data)
@@ -51,7 +55,8 @@ def test_login_invalid_credentials(client, test_user):
 
 
 def test_get_me(authorized_client, test_user):
-    # Test getting current user
+    """Test getting current user"""
+
     response = authorized_client.get("/api/v1/auth/me")
     assert response.status_code == status.HTTP_200_OK
 
@@ -62,6 +67,7 @@ def test_get_me(authorized_client, test_user):
 
 
 def test_get_me_unauthorized(client):
-    # Test getting current user without authentication
+    """Test getting current user without authentication"""
+
     response = client.get("/api/v1/auth/me")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
