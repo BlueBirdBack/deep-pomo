@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 from typing import List, Optional
 from app.schemas.tasks import TaskCreate, TaskUpdate
-from app.db.models import Task
+from app.db.models import Task, TaskHistory
 from sqlalchemy import func
 from datetime import UTC
 
@@ -21,15 +21,37 @@ def create_task(db: Session, task: TaskCreate, user_id: int) -> Task:
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
+
+    # Create history entry for task creation
+    history_entry = TaskHistory(
+        task_id=db_task.id,
+        user_id=user_id,
+        action="created",
+        changes={
+            "title": {"old": None, "new": task.title},
+            "description": {"old": None, "new": task.description},
+            "priority": {"old": None, "new": task.priority},
+            "status": {"old": None, "new": task.status},
+            "parent_id": {"old": None, "new": task.parent_id},
+            "color_code": {"old": None, "new": task.color_code},
+            "estimated_duration": {"old": None, "new": task.estimated_duration},
+        },
+    )
+    db.add(history_entry)
+    db.commit()
+
     return db_task
 
 
-def get_task(db: Session, task_id: int, user_id: int) -> Optional[Task]:
-    return (
-        db.query(Task)
-        .filter(Task.id == task_id, Task.user_id == user_id, Task.deleted_at.is_(None))
-        .first()
-    )
+def get_task(
+    db: Session, task_id: int, user_id: int, include_deleted: bool = False
+) -> Optional[Task]:
+    query = db.query(Task).filter(Task.id == task_id, Task.user_id == user_id)
+
+    if not include_deleted:
+        query = query.filter(Task.deleted_at.is_(None))
+
+    return query.first()
 
 
 def get_tasks(
@@ -55,15 +77,29 @@ def get_tasks(
 
 
 def update_task(
-    db: Session, task_id: int, user_id: int, task_update: TaskUpdate
+    db: Session, task_id: int, user_id: int, task_update: dict
 ) -> Optional[Task]:
     db_task = get_task(db, task_id, user_id)
     if not db_task:
         return None
 
-    update_data = task_update.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_task, key, value)
+    # Record old values for history
+    changes = {}
+    for key, new_value in task_update.items():
+        old_value = getattr(db_task, key)
+        if old_value != new_value:  # Only record if value actually changed
+            changes[key] = {"old": old_value, "new": new_value}
+            setattr(db_task, key, new_value)
+
+    # Only create history entry if there were actual changes
+    if changes:
+        history_entry = TaskHistory(
+            task_id=task_id,
+            user_id=user_id,
+            action="updated",
+            changes=changes,
+        )
+        db.add(history_entry)
 
     db.commit()
     db.refresh(db_task)
@@ -80,11 +116,32 @@ def delete_task(
     if soft_delete:
         from datetime import datetime
 
-        db_task.deleted_at = datetime.now(UTC)
+        # Record old value for history
+        old_deleted_at = db_task.deleted_at
+        new_deleted_at = datetime.now(UTC)
+
+        # Update the task
+        db_task.deleted_at = new_deleted_at
+
+        # Create history entry
+        history_entry = TaskHistory(
+            task_id=task_id,
+            user_id=user_id,
+            action="soft_deleted",
+            changes={
+                "deleted_at": {
+                    "old": old_deleted_at.isoformat() if old_deleted_at else None,
+                    "new": new_deleted_at.isoformat(),
+                }
+            },
+        )
+        db.add(history_entry)
         db.commit()
     else:
+        # For hard delete, we don't create history since the task will be gone
         db.delete(db_task)
         db.commit()
+
     return True
 
 
@@ -116,3 +173,45 @@ def get_task_children(db: Session, task_id: int, user_id: int):
         text("SELECT * FROM get_task_children(:task_id)"), {"task_id": task_id}
     )
     return [{"id": row.id, "title": row.title, "level": row.level} for row in result]
+
+
+def get_task_history(db: Session, task_id: int):
+    """Get history for a specific task"""
+    return (
+        db.query(TaskHistory)
+        .filter(TaskHistory.task_id == task_id)
+        .order_by(TaskHistory.timestamp.asc())
+        .all()
+    )
+
+
+def restore_task(db: Session, task_id: int, user_id: int):
+    """Restore a soft-deleted task"""
+    db_task = get_task(db, task_id, user_id, include_deleted=True)
+    if not db_task:
+        return None
+
+    # Record the old value for history
+    old_deleted_at = db_task.deleted_at
+
+    # Restore the task
+    db_task.deleted_at = None
+    db.commit()
+    db.refresh(db_task)
+
+    # Create history entry
+    history_entry = TaskHistory(
+        task_id=task_id,
+        user_id=user_id,
+        action="restored",
+        changes={
+            "deleted_at": {
+                "old": old_deleted_at.isoformat() if old_deleted_at else None,
+                "new": None,
+            }
+        },
+    )
+    db.add(history_entry)
+    db.commit()
+
+    return db_task

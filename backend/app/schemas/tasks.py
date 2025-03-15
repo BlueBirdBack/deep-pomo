@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Dict, Any
 from datetime import datetime
 
 
@@ -58,3 +58,17 @@ class TaskWithChildren(Task):
 
 
 TaskChild.model_rebuild()
+
+
+class TaskHistoryBase(BaseModel):
+    task_id: int
+    user_id: int
+    action: str
+    changes: Dict[str, Dict[str, Any]]
+    timestamp: datetime
+
+
+class TaskHistory(TaskHistoryBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)

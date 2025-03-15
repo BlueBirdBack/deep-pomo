@@ -9,9 +9,11 @@ from app.schemas.tasks import (
     TaskUpdate,
     TaskBreadcrumb,
     TaskWithChildren,
+    TaskHistory,
 )
 from app.db.repositories import tasks as tasks_repository
 from app.schemas.users import User
+from app.schemas import tasks as schemas
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -193,3 +195,71 @@ def get_task_with_children(
             )
 
     return task_dict
+
+
+@router.get("/{task_id}/history", response_model=List[TaskHistory])
+def get_task_history(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get history for a specific task"""
+    # Verify task exists and belongs to user (even if it's soft-deleted)
+    task = tasks_repository.get_task(db, task_id, current_user.id, include_deleted=True)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+
+    # Get task history
+    history = tasks_repository.get_task_history(db, task_id)
+    return history
+
+
+@router.patch("/{task_id}", response_model=schemas.Task)
+def update_task_partial(
+    task_id: int,
+    task_update: schemas.TaskUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update a task partially (PATCH method)"""
+    # Get the existing task
+    db_task = tasks_repository.get_task(db, task_id, current_user.id)
+    if not db_task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+
+    # Update the task
+    updated_task = tasks_repository.update_task(
+        db, task_id, current_user.id, task_update.model_dump(exclude_unset=True)
+    )
+    return updated_task
+
+
+@router.post("/{task_id}/restore", response_model=schemas.Task)
+def restore_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Restore a soft-deleted task"""
+    # Get the task (including deleted ones)
+    db_task = tasks_repository.get_task(
+        db, task_id, current_user.id, include_deleted=True
+    )
+    if not db_task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+
+    # Check if the task is actually deleted
+    if db_task.deleted_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Task is not deleted"
+        )
+
+    # Restore the task
+    restored_task = tasks_repository.restore_task(db, task_id, current_user.id)
+    return restored_task
