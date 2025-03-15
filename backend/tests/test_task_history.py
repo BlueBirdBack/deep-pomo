@@ -2,7 +2,6 @@
 
 import pytest
 from fastapi import status
-from datetime import datetime
 
 
 @pytest.mark.task_history
@@ -27,7 +26,7 @@ def test_task_history_create(authorized_client, test_user, db):
 
 
 @pytest.mark.task_history
-def test_task_history_update(authorized_client, test_user, db):
+def test_task_history_update(authorized_client):
     """Test task history is created when a task is updated"""
 
     # Create a task
@@ -64,7 +63,7 @@ def test_task_history_update(authorized_client, test_user, db):
 
 
 @pytest.mark.task_history
-def test_task_history_soft_delete(authorized_client, test_user, db):
+def test_task_history_soft_delete(authorized_client):
     """Test task history is created when a task is soft deleted"""
     # Create a task
     task_data = {"title": "Task to Delete", "status": "pending"}
@@ -93,7 +92,7 @@ def test_task_history_soft_delete(authorized_client, test_user, db):
 
 
 @pytest.mark.task_history
-def test_task_history_restore(authorized_client, test_user, db):
+def test_task_history_restore(authorized_client):
     """Test task history is created when a soft-deleted task is restored"""
     # Create a task
     task_data = {"title": "Task to Restore", "status": "pending"}
