@@ -1,9 +1,13 @@
-from pydantic import BaseModel, Field
+"""Settings schemas"""
+
 from typing import Optional
 from datetime import datetime
+from pydantic import BaseModel, ConfigDict
 
 
 class UserSettingsBase(BaseModel):
+    """Base user settings model"""
+
     pomodoro_duration: int = 1500  # 25 minutes in seconds
     short_break_duration: int = 300  # 5 minutes
     long_break_duration: int = 900  # 15 minutes
@@ -13,6 +17,8 @@ class UserSettingsBase(BaseModel):
 
 
 class UserSettingsUpdate(BaseModel):
+    """User settings update model"""
+
     pomodoro_duration: Optional[int] = None
     short_break_duration: Optional[int] = None
     long_break_duration: Optional[int] = None
@@ -22,8 +28,10 @@ class UserSettingsUpdate(BaseModel):
 
 
 class UserSettings(UserSettingsBase):
+    """User settings model"""
+
     user_id: int
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    # Replace the class Config with this:
+    model_config = ConfigDict(from_attributes=True)
