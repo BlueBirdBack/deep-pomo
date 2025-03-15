@@ -64,21 +64,17 @@ def read_pomodoro(
     return pomodoro
 
 
-@router.put("/{pomodoro_id}", response_model=PomodoroSession)
+@router.patch("/{pomodoro_id}", response_model=PomodoroSession)
 def update_pomodoro(
     pomodoro_id: int,
     pomodoro_update: PomodoroUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    updated_pomodoro = pomodoros_repository.update_pomodoro(
+    """Update a pomodoro session, including interruption details"""
+    return pomodoros_repository.update_pomodoro(
         db, pomodoro_id, current_user.id, pomodoro_update
     )
-    if not updated_pomodoro:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Pomodoro session not found"
-        )
-    return updated_pomodoro
 
 
 @router.post("/{pomodoro_id}/complete", response_model=PomodoroSession)

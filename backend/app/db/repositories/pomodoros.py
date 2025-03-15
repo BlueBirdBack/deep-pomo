@@ -14,7 +14,7 @@ def create_pomodoro(
 ) -> PomodoroSession:
     db_pomodoro = PomodoroSession(
         user_id=user_id,
-        start_time=pomodoro.start_time or datetime.utcnow(),
+        start_time=pomodoro.start_time or datetime.now(UTC),
         duration=pomodoro.duration,
         session_type=pomodoro.session_type,
     )
@@ -75,13 +75,32 @@ def get_pomodoros(
 def update_pomodoro(
     db: Session, pomodoro_id: int, user_id: int, pomodoro_update: PomodoroUpdate
 ) -> Optional[PomodoroSession]:
+    """Update a pomodoro session with new values"""
     db_pomodoro = get_pomodoro(db, pomodoro_id, user_id)
     if not db_pomodoro:
         return None
 
-    update_data = pomodoro_update.dict(exclude_unset=True)
+    # Update the pomodoro with the provided values
+    update_data = pomodoro_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_pomodoro, key, value)
+
+    # If completing or interrupting, ensure end_time and actual_duration are set
+    if "completed" in update_data or "interruption_reason" in update_data:
+        if not db_pomodoro.end_time:
+            db_pomodoro.end_time = datetime.now(UTC)
+
+        if not db_pomodoro.actual_duration:
+            # Ensure both datetimes are timezone-aware
+            start_time = db_pomodoro.start_time
+            end_time = db_pomodoro.end_time
+
+            if start_time.tzinfo is None:
+                start_time = start_time.replace(tzinfo=UTC)
+            if end_time.tzinfo is None:
+                end_time = end_time.replace(tzinfo=UTC)
+
+            db_pomodoro.actual_duration = int((end_time - start_time).total_seconds())
 
     db.commit()
     db.refresh(db_pomodoro)
@@ -101,13 +120,23 @@ def complete_pomodoro(
         return None
 
     db_pomodoro.completed = True
-    db_pomodoro.end_time = end_time or datetime.utcnow()
+    db_pomodoro.end_time = end_time or datetime.now(UTC)
 
     if actual_duration is not None:
         db_pomodoro.actual_duration = actual_duration
     else:
+        # Ensure both datetimes are timezone-aware before subtraction
+        start_time = db_pomodoro.start_time
+        end_time = db_pomodoro.end_time
+
+        # Convert naive datetime to aware if needed
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=UTC)
+        if end_time.tzinfo is None:
+            end_time = end_time.replace(tzinfo=UTC)
+
         # Calculate actual duration in seconds
-        delta = db_pomodoro.end_time - db_pomodoro.start_time
+        delta = end_time - start_time
         db_pomodoro.actual_duration = int(delta.total_seconds())
 
     if interruption_reason:

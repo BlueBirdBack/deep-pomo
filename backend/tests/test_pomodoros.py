@@ -20,7 +20,7 @@ def test_create_pomodoro(authorized_client, test_user):
 
 def test_get_pomodoros(authorized_client, db, test_user):
     # Create some pomodoro sessions
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     pomodoros = [
         PomodoroSession(
             user_id=test_user.id,
@@ -75,7 +75,7 @@ def test_complete_pomodoro(authorized_client, db, test_user):
     # Create a pomodoro session
     pomodoro = PomodoroSession(
         user_id=test_user.id,
-        start_time=datetime.utcnow(),
+        start_time=datetime.now(UTC),
         duration=1500,
         session_type="work",
         completed=False,
@@ -109,7 +109,7 @@ def test_associate_task_with_pomodoro(authorized_client, db, test_user):
     # Create a pomodoro session
     pomodoro = PomodoroSession(
         user_id=test_user.id,
-        start_time=datetime.utcnow(),
+        start_time=datetime.now(UTC),
         duration=1500,
         session_type="work",
         completed=False,
@@ -158,7 +158,7 @@ def test_delete_pomodoro(authorized_client, db, test_user):
     # Create a pomodoro session
     pomodoro = PomodoroSession(
         user_id=test_user.id,
-        start_time=datetime.utcnow(),
+        start_time=datetime.now(UTC),
         duration=1500,
         session_type="work",
         completed=False,
@@ -240,7 +240,7 @@ def test_pomodoro_soft_delete_cascade(authorized_client, db, test_user):
     """Test soft deleting a pomodoro session cascades to associations"""
     # Create a pomodoro session
     pomodoro_data = {
-        "start_time": datetime.utcnow().isoformat(),
+        "start_time": datetime.now(UTC).isoformat(),
         "duration": 1500,
         "session_type": "work",
         "completed": False,
@@ -292,7 +292,7 @@ def test_pomodoro_restoration_cascade(authorized_client, db, test_user):
     # Create a pomodoro session
     pomodoro = PomodoroSession(
         user_id=test_user.id,
-        start_time=datetime.utcnow(),
+        start_time=datetime.now(UTC),
         duration=1500,
         session_type="work",
         completed=False,
