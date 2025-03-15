@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 from app.schemas.pomodoros import (
     PomodoroCreate,
     PomodoroUpdate,
@@ -126,7 +126,7 @@ def delete_pomodoro(
         return False
 
     if soft_delete:
-        db_pomodoro.deleted_at = datetime.utcnow()
+        db_pomodoro.deleted_at = datetime.now(UTC)
         db.commit()
     else:
         db.delete(db_pomodoro)

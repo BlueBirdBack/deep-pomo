@@ -18,6 +18,7 @@ def test_update_user(authorized_client, test_user):
     assert data["id"] == test_user.id
 
 
+@pytest.mark.users
 def test_get_user_settings(authorized_client, test_user):
     """Test retrieving user settings"""
     response = authorized_client.get("/api/v1/users/me/settings")
@@ -29,6 +30,7 @@ def test_get_user_settings(authorized_client, test_user):
     assert "theme" in data
 
 
+@pytest.mark.users
 def test_update_user_settings(authorized_client, test_user):
     """Test updating user settings"""
     settings_data = {"pomodoro_duration": 1800, "theme": "dark"}  # 30 minutes

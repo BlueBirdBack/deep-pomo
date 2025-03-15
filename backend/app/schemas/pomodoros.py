@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
+from pydantic import ConfigDict
 
 
 class PomodoroBase(BaseModel):
@@ -51,5 +52,4 @@ class PomodoroTaskAssociation(PomodoroTaskAssociationBase):
     id: int
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

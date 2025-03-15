@@ -4,6 +4,7 @@ from typing import List, Optional
 from app.schemas.tasks import TaskCreate, TaskUpdate
 from app.db.models import Task
 from sqlalchemy import func
+from datetime import UTC
 
 
 def create_task(db: Session, task: TaskCreate, user_id: int) -> Task:
@@ -60,7 +61,7 @@ def update_task(
     if not db_task:
         return None
 
-    update_data = task_update.dict(exclude_unset=True)
+    update_data = task_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_task, key, value)
 
@@ -79,7 +80,7 @@ def delete_task(
     if soft_delete:
         from datetime import datetime
 
-        db_task.deleted_at = datetime.utcnow()
+        db_task.deleted_at = datetime.now(UTC)
         db.commit()
     else:
         db.delete(db_task)

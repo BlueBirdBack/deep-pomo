@@ -1,10 +1,14 @@
+"""Test task endpoints"""
+
 import pytest
 from fastapi import status
 from app.db.models import Task
 
 
+@pytest.mark.tasks
 def test_create_task(authorized_client, test_user):
-    # Test creating a task
+    """Test creating a task"""
+
     task_data = {
         "title": "Test Task",
         "description": "This is a test task",
@@ -23,7 +27,10 @@ def test_create_task(authorized_client, test_user):
     assert data["user_id"] == test_user.id
 
 
+@pytest.mark.tasks
 def test_create_subtask(authorized_client, db, test_user):
+    """Test creating a subtask"""
+
     # First create a parent task
     parent_task = Task(user_id=test_user.id, title="Parent Task", status="pending")
     db.add(parent_task)
@@ -41,14 +48,21 @@ def test_create_subtask(authorized_client, db, test_user):
     assert data["parent_id"] == parent_task.id
 
 
+@pytest.mark.tasks
 def test_get_tasks(authorized_client, db, test_user):
-    # Create some tasks
-    tasks = [
-        Task(user_id=test_user.id, title="Task 1", status="pending"),
-        Task(user_id=test_user.id, title="Task 2", status="in_progress"),
-        Task(user_id=test_user.id, title="Task 3", status="completed"),
-    ]
-    db.add_all(tasks)
+    """Test getting tasks"""
+
+    # Create some tasks one by one to allow the trigger to set the path
+    task1 = Task(user_id=test_user.id, title="Task 1", status="pending")
+    db.add(task1)
+    db.commit()
+
+    task2 = Task(user_id=test_user.id, title="Task 2", status="in_progress")
+    db.add(task2)
+    db.commit()
+
+    task3 = Task(user_id=test_user.id, title="Task 3", status="completed")
+    db.add(task3)
     db.commit()
 
     # Get all tasks
@@ -67,7 +81,10 @@ def test_get_tasks(authorized_client, db, test_user):
     assert data[0]["title"] == "Task 2"
 
 
+@pytest.mark.tasks
 def test_get_task(authorized_client, db, test_user):
+    """Test getting a task"""
+
     # Create a task
     task = Task(
         user_id=test_user.id,
@@ -89,7 +106,10 @@ def test_get_task(authorized_client, db, test_user):
     assert data["description"] == task.description
 
 
+@pytest.mark.tasks
 def test_update_task(authorized_client, db, test_user):
+    """Test updating a task"""
+
     # Create a task
     task = Task(user_id=test_user.id, title="Original Title", status="pending")
     db.add(task)
@@ -112,7 +132,10 @@ def test_update_task(authorized_client, db, test_user):
     assert task.status == update_data["status"]
 
 
+@pytest.mark.tasks
 def test_delete_task(authorized_client, db, test_user):
+    """Test deleting a task"""
+
     # Create a task
     task = Task(user_id=test_user.id, title="Task to Delete", status="pending")
     db.add(task)
@@ -134,7 +157,10 @@ def test_delete_task(authorized_client, db, test_user):
     assert len(data) == 0
 
 
+@pytest.mark.tasks
 def test_task_breadcrumb(authorized_client, db, test_user):
+    """Test getting a task's breadcrumb"""
+
     # Create a hierarchy of tasks
     task1 = Task(user_id=test_user.id, title="Task 1", status="pending")
     db.add(task1)
@@ -166,7 +192,10 @@ def test_task_breadcrumb(authorized_client, db, test_user):
     assert data[2]["id"] == task3.id
 
 
+@pytest.mark.tasks
 def test_task_hierarchy(authorized_client, test_user):
+    """Test creating a task hierarchy"""
+
     # Create parent task
     parent_task_data = {
         "title": "Parent Task",

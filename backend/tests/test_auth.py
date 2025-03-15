@@ -32,6 +32,7 @@ def test_register_user(client):
     assert "id" in data
 
 
+@pytest.mark.auth
 def test_login(client, test_user):
     """Test user login"""
 
@@ -45,6 +46,7 @@ def test_login(client, test_user):
     assert data["token_type"] == "bearer"
 
 
+@pytest.mark.auth
 def test_login_invalid_credentials(client, test_user):
     """Test user login with invalid credentials"""
 
@@ -54,6 +56,7 @@ def test_login_invalid_credentials(client, test_user):
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
+@pytest.mark.auth
 def test_get_me(authorized_client, test_user):
     """Test getting current user"""
 
@@ -66,6 +69,7 @@ def test_get_me(authorized_client, test_user):
     assert data["email"] == test_user.email
 
 
+@pytest.mark.auth
 def test_get_me_unauthorized(client):
     """Test getting current user without authentication"""
 
