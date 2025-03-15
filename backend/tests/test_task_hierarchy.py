@@ -1,8 +1,11 @@
+"""Test task hierarchy functionality"""
+
 import pytest
 from fastapi import status
 from app.db.models import Task
 
 
+@pytest.mark.tasks
 def test_create_hierarchical_tasks(authorized_client, test_user, db):
     """Test creating tasks with parent-child relationships"""
     # Create parent task
@@ -15,6 +18,10 @@ def test_create_hierarchical_tasks(authorized_client, test_user, db):
     parent_response = authorized_client.post("/api/v1/tasks/", json=parent_task_data)
     assert parent_response.status_code == status.HTTP_201_CREATED
     parent_id = parent_response.json()["id"]
+
+    # Verify the task belongs to test_user
+    parent_task = db.query(Task).filter(Task.id == parent_id).first()
+    assert parent_task.user_id == test_user.id
 
     # Create child task
     child_task_data = {
@@ -40,6 +47,11 @@ def test_create_hierarchical_tasks(authorized_client, test_user, db):
         "/api/v1/tasks/", json=grandchild_task_data
     )
     assert grandchild_response.status_code == status.HTTP_201_CREATED
+    grandchild_id = grandchild_response.json()["id"]
+
+    # Verify the grandchild task belongs to test_user
+    grandchild_task = db.query(Task).filter(Task.id == grandchild_id).first()
+    assert grandchild_task.user_id == test_user.id
 
     # Verify paths were correctly set by LTREE
     parent_task = db.query(Task).filter(Task.id == parent_id).first()
@@ -53,6 +65,7 @@ def test_create_hierarchical_tasks(authorized_client, test_user, db):
     assert grandchild_task.path == f"{parent_id}.{child_id}.{grandchild_task.id}"
 
 
+@pytest.mark.tasks
 def test_get_task_children(authorized_client, test_user, db):
     """Test retrieving all children of a task"""
     # Create parent task
@@ -60,14 +73,20 @@ def test_get_task_children(authorized_client, test_user, db):
     parent_response = authorized_client.post("/api/v1/tasks/", json=parent_task_data)
     parent_id = parent_response.json()["id"]
 
+    # Verify the task belongs to test_user
+    parent_task = db.query(Task).filter(Task.id == parent_id).first()
+    assert parent_task.user_id == test_user.id
+
     # Create several child tasks
+    child_ids = []
     for i in range(3):
         child_task_data = {
             "title": f"Child Task {i+1}",
             "status": "pending",
             "parent_id": parent_id,
         }
-        authorized_client.post("/api/v1/tasks/", json=child_task_data)
+        response = authorized_client.post("/api/v1/tasks/", json=child_task_data)
+        child_ids.append(response.json()["id"])
 
     # Create a nested child
     child_response = authorized_client.post(
@@ -75,31 +94,54 @@ def test_get_task_children(authorized_client, test_user, db):
         json={"title": "Child Task 1", "status": "pending", "parent_id": parent_id},
     )
     child_id = child_response.json()["id"]
+    child_ids.append(child_id)
 
-    authorized_client.post(
+    # Create a grandchild task
+    grandchild_response = authorized_client.post(
         "/api/v1/tasks/",
         json={"title": "Grandchild Task", "status": "pending", "parent_id": child_id},
     )
+    grandchild_id = grandchild_response.json()["id"]
+
+    # Verify the grandchild task belongs to test_user
+    grandchild_task = db.query(Task).filter(Task.id == grandchild_id).first()
+    assert grandchild_task.user_id == test_user.id
 
     # Get children of parent task
     response = authorized_client.get(f"/api/v1/tasks/{parent_id}/children")
     assert response.status_code == status.HTTP_200_OK
     children = response.json()
 
+    # Filter to only include direct children (level 1)
+    direct_children = [child for child in children if child["level"] == 1]
+
     # Should have 4 direct children
-    assert len(children) == 4
+    assert len(direct_children) == 4
+
+    # All direct children should be in our list of child IDs
+    for child in direct_children:
+        assert child["id"] in child_ids
 
 
-def test_prevent_circular_references(authorized_client, test_user):
+@pytest.mark.tasks
+def test_prevent_circular_references(authorized_client, test_user, db):
     """Test prevention of circular references in task hierarchy"""
     # Create two tasks
     task1_data = {"title": "Task 1", "status": "pending"}
     task1_response = authorized_client.post("/api/v1/tasks/", json=task1_data)
     task1_id = task1_response.json()["id"]
 
+    # Verify task1 belongs to test_user
+    task1 = db.query(Task).filter(Task.id == task1_id).first()
+    assert task1.user_id == test_user.id
+
     task2_data = {"title": "Task 2", "status": "pending", "parent_id": task1_id}
     task2_response = authorized_client.post("/api/v1/tasks/", json=task2_data)
     task2_id = task2_response.json()["id"]
+
+    # Verify task2 belongs to test_user
+    task2 = db.query(Task).filter(Task.id == task2_id).first()
+    assert task2.user_id == test_user.id
 
     # Try to make task1 a child of task2, creating a circular reference
     update_data = {"parent_id": task2_id}
@@ -117,6 +159,10 @@ def test_ltree_path_update_on_reparenting(authorized_client, db, test_user):
     task_a_data = {"title": "Task A", "status": "pending"}
     response = authorized_client.post("/api/v1/tasks/", json=task_a_data)
     task_a_id = response.json()["id"]
+
+    # Verify task A belongs to test_user
+    task_a = db.query(Task).filter(Task.id == task_a_id).first()
+    assert task_a.user_id == test_user.id
 
     # Create task B as child of A
     task_b_data = {"title": "Task B", "status": "pending", "parent_id": task_a_id}
