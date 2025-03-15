@@ -68,42 +68,25 @@ def read_task(
     return task
 
 
-@router.put("/{task_id}", response_model=Task)
+@router.put("/{task_id}", response_model=schemas.Task)
 def update_task(
     task_id: int,
-    task_update: TaskUpdate,
+    task_update: schemas.TaskUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # If parent_id is being updated, verify it exists and belongs to the user
-    if task_update.parent_id is not None:
-        # Check for circular reference
-        if task_update.parent_id == task_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Task cannot be its own parent",
-            )
-
-        if task_update.parent_id != 0:  # 0 means set to null/root
-            parent_task = tasks_repository.get_task(
-                db, task_update.parent_id, current_user.id
-            )
-            if not parent_task:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Parent task not found",
-                )
-        else:
-            # Convert 0 to None for setting as root task
-            task_update.parent_id = None
-
-    updated_task = tasks_repository.update_task(
-        db, task_id, current_user.id, task_update
-    )
-    if not updated_task:
+    """Update a task (PUT method)"""
+    # Get the existing task
+    db_task = tasks_repository.get_task(db, task_id, current_user.id)
+    if not db_task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
+
+    # Update the task - convert Pydantic model to dict
+    updated_task = tasks_repository.update_task(
+        db, task_id, current_user.id, task_update.model_dump()
+    )
     return updated_task
 
 
