@@ -90,7 +90,23 @@ CREATE TABLE user_settings (
     pomodoros_until_long_break INTEGER DEFAULT 4,
     theme VARCHAR(20) DEFAULT 'light',
     notification_enabled BOOLEAN DEFAULT TRUE,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    quick_start_duration INTEGER DEFAULT 300, -- 5 minutes in seconds for micro-timer
+    wind_down_alert BOOLEAN DEFAULT TRUE,
+    wind_down_time INTEGER DEFAULT 180, -- 3 minutes before end in seconds
+    auto_timer_start BOOLEAN DEFAULT TRUE,
+    auto_break_start BOOLEAN DEFAULT TRUE,
+    pause_reset_time INTEGER DEFAULT 300, -- 5 minutes until reset in seconds
+    timer_end_alert_type alert_type DEFAULT 'switch_to_rest',
+    break_end_alert_type alert_type DEFAULT 'sound_and_visual'
+);
+
+-- Create ENUMs for alert types
+CREATE TYPE alert_type AS ENUM (
+    'switch_to_rest',
+    'sound',
+    'visual',
+    'sound_and_visual'
 );
 
 -- Indexes
@@ -383,5 +399,38 @@ BEGIN
     -- Check if descendant_path contains ancestor_path as a prefix
     -- AND ensure it's a true descendant (not the same node)
     RETURN descendant_path <@ ancestor_path AND nlevel(descendant_path) > nlevel(ancestor_path);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create a comprehensive table for tracking session interruptions
+CREATE TABLE pomodoro_session_interruptions (
+    id SERIAL PRIMARY KEY,
+    pomodoro_session_id INTEGER NOT NULL REFERENCES pomodoro_sessions(id) ON DELETE CASCADE,
+    paused_at TIMESTAMPTZ NOT NULL,
+    resumed_at TIMESTAMPTZ,
+    duration INTEGER, -- Calculated when resumed
+    resulted_in_reset BOOLEAN DEFAULT FALSE, -- Whether this pause led to a reset
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add indexes for efficient querying
+CREATE INDEX pomodoro_interruptions_session_idx ON pomodoro_session_interruptions(pomodoro_session_id);
+CREATE INDEX pomodoro_interruptions_reset_idx ON pomodoro_session_interruptions(resulted_in_reset) 
+    WHERE resulted_in_reset = TRUE;
+
+-- Improved function to get session pause stats
+CREATE OR REPLACE FUNCTION get_session_pause_stats(session_id INTEGER)
+RETURNS TABLE(is_paused BOOLEAN, current_pause_id INTEGER, total_pause_duration INTEGER) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    EXISTS(SELECT 1 FROM pomodoro_session_interruptions 
+           WHERE pomodoro_session_id = session_id AND resumed_at IS NULL) AS is_paused,
+    (SELECT id FROM pomodoro_session_interruptions 
+     WHERE pomodoro_session_id = session_id AND resumed_at IS NULL
+     LIMIT 1) AS current_pause_id,
+    COALESCE(SUM(duration), 0)::INTEGER AS total_pause_duration
+  FROM pomodoro_session_interruptions
+  WHERE pomodoro_session_id = session_id AND resumed_at IS NOT NULL;
 END;
 $$ LANGUAGE plpgsql;
