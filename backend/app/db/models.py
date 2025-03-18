@@ -18,8 +18,6 @@ from sqlalchemy.orm import relationship, backref, DeclarativeBase
 class Base(DeclarativeBase):
     """Base class for all models"""
 
-    pass
-
 
 class User(Base):
     """User model"""
