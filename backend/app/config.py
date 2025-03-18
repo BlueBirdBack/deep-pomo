@@ -1,3 +1,5 @@
+"""Configuration for the application"""
+
 import os
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
@@ -6,6 +8,8 @@ load_dotenv()
 
 
 class Settings(BaseSettings):
+    """Settings for the application"""
+
     PROJECT_NAME: str = "DeepPomo"
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key")

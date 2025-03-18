@@ -1,3 +1,5 @@
+"""Main module for the DeepPomo API"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import auth, users, tasks, pomodoros
@@ -25,4 +27,5 @@ app.include_router(pomodoros.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():
+    """Root endpoint"""
     return {"message": "Welcome to the DeepPomo API"}
