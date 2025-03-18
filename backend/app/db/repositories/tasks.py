@@ -1,13 +1,16 @@
+"""Task repository"""
+
+from typing import List, Optional
+from datetime import datetime, UTC
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
-from typing import List, Optional
-from app.schemas.tasks import TaskCreate, TaskUpdate
+from app.schemas.tasks import TaskCreate
 from app.db.models import Task, TaskHistory
-from sqlalchemy import func
-from datetime import UTC
 
 
 def create_task(db: Session, task: TaskCreate, user_id: int) -> Task:
+    """Create a task"""
     db_task = Task(
         user_id=user_id,
         title=task.title,
@@ -46,6 +49,7 @@ def create_task(db: Session, task: TaskCreate, user_id: int) -> Task:
 def get_task(
     db: Session, task_id: int, user_id: int, include_deleted: bool = False
 ) -> Optional[Task]:
+    """Get a task by ID"""
     query = db.query(Task).filter(Task.id == task_id, Task.user_id == user_id)
 
     if not include_deleted:
@@ -62,6 +66,7 @@ def get_tasks(
     skip: int = 0,
     limit: int = 100,
 ) -> List[Task]:
+    """Get all tasks"""
     query = db.query(Task).filter(Task.user_id == user_id, Task.deleted_at.is_(None))
 
     if parent_id is not None:
@@ -97,8 +102,6 @@ def update_task(
 
     # Handle completed_at field based on status changes
     if "status" in changes:
-        from datetime import datetime, UTC
-
         # If status changed to completed, set completed_at
         if changes["status"]["new"] == "completed" and db_task.completed_at is None:
             completed_at = datetime.now(UTC)
@@ -121,7 +124,7 @@ def update_task(
                 ),
                 "new": None,
             }
-            db_task.completed_at = None
+            db_task.completed_at = None  # type: ignore
             # Ensure the change is committed to the database immediately
             db.flush()
 
@@ -143,19 +146,18 @@ def update_task(
 def delete_task(
     db: Session, task_id: int, user_id: int, soft_delete: bool = True
 ) -> bool:
+    """Delete a task"""
     db_task = get_task(db, task_id, user_id)
     if not db_task:
         return False
 
     if soft_delete:
-        from datetime import datetime
-
         # Record old value for history
         old_deleted_at = db_task.deleted_at
         new_deleted_at = datetime.now(UTC)
 
         # Update the task
-        db_task.deleted_at = new_deleted_at
+        db_task.deleted_at = new_deleted_at  # type: ignore
 
         # Create history entry
         history_entry = TaskHistory(
@@ -180,6 +182,7 @@ def delete_task(
 
 
 def get_task_breadcrumb(db: Session, task_id: int, user_id: int):
+    """Get the breadcrumb for a task"""
     # Verify task exists and belongs to user
     task = get_task(db, task_id, user_id)
     if not task:
@@ -229,7 +232,7 @@ def restore_task(db: Session, task_id: int, user_id: int):
     old_deleted_at = db_task.deleted_at
 
     # Restore the task
-    db_task.deleted_at = None
+    db_task.deleted_at = None  # type: ignore
     db.commit()
     db.refresh(db_task)
 
