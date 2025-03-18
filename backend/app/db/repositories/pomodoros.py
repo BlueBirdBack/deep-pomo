@@ -1,6 +1,9 @@
-from sqlalchemy.orm import Session
+"""Repository for pomodoro sessions"""
+
 from typing import List, Optional
 from datetime import datetime, UTC
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import text
 from app.schemas.pomodoros import (
     PomodoroCreate,
     PomodoroUpdate,
@@ -10,13 +13,14 @@ from app.db.models import (
     PomodoroSession,
     PomodoroTaskAssociation,
     PomodoroSessionInterruption,
+    Task,
 )
-from sqlalchemy.sql import text
 
 
 def create_pomodoro(
     db: Session, pomodoro: PomodoroCreate, user_id: int
 ) -> PomodoroSession:
+    """Create a new pomodoro session"""
     db_pomodoro = PomodoroSession(
         user_id=user_id,
         start_time=pomodoro.start_time or datetime.now(UTC),
@@ -32,6 +36,7 @@ def create_pomodoro(
 def get_pomodoro(
     db: Session, pomodoro_id: int, user_id: int
 ) -> Optional[PomodoroSession]:
+    """Get a pomodoro session by ID"""
     return (
         db.query(PomodoroSession)
         .filter(
@@ -53,6 +58,7 @@ def get_pomodoros(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
 ) -> List[PomodoroSession]:
+    """Get all pomodoro sessions for a user"""
     query = db.query(PomodoroSession).filter(
         PomodoroSession.user_id == user_id, PomodoroSession.deleted_at.is_(None)
     )
@@ -93,7 +99,7 @@ def update_pomodoro(
     # If completing or interrupting, ensure end_time and actual_duration are set
     if "completed" in update_data or "interruption_reason" in update_data:
         if not db_pomodoro.end_time:
-            db_pomodoro.end_time = datetime.now(UTC)
+            db_pomodoro.end_time = datetime.now(UTC)  # type: ignore
 
         if not db_pomodoro.actual_duration:
             # Ensure both datetimes are timezone-aware
@@ -105,7 +111,7 @@ def update_pomodoro(
             if end_time.tzinfo is None:
                 end_time = end_time.replace(tzinfo=UTC)
 
-            db_pomodoro.actual_duration = int((end_time - start_time).total_seconds())
+            db_pomodoro.actual_duration = int((end_time - start_time).total_seconds())  # type: ignore
 
     db.commit()
     db.refresh(db_pomodoro)
@@ -120,32 +126,33 @@ def complete_pomodoro(
     actual_duration: Optional[int] = None,
     interruption_reason: Optional[str] = None,
 ) -> Optional[PomodoroSession]:
+    """Complete a pomodoro session"""
     db_pomodoro = get_pomodoro(db, pomodoro_id, user_id)
     if not db_pomodoro:
         return None
 
-    db_pomodoro.completed = True
-    db_pomodoro.end_time = end_time or datetime.now(UTC)
+    db_pomodoro.completed = True  # type: ignore
+    db_pomodoro.end_time = end_time or datetime.now(UTC).astimezone(UTC)  # type: ignore
 
     if actual_duration is not None:
-        db_pomodoro.actual_duration = actual_duration
+        db_pomodoro.actual_duration = actual_duration  # type: ignore
     else:
         # Ensure both datetimes are timezone-aware before subtraction
         start_time = db_pomodoro.start_time
-        end_time = db_pomodoro.end_time
+        end_time = db_pomodoro.end_time  # type: ignore
 
         # Convert naive datetime to aware if needed
         if start_time.tzinfo is None:
             start_time = start_time.replace(tzinfo=UTC)
-        if end_time.tzinfo is None:
+        if end_time and end_time.tzinfo is None:
             end_time = end_time.replace(tzinfo=UTC)
 
         # Calculate actual duration in seconds
         delta = end_time - start_time
-        db_pomodoro.actual_duration = int(delta.total_seconds())
+        db_pomodoro.actual_duration = int(delta.total_seconds())  # type: ignore
 
     if interruption_reason:
-        db_pomodoro.interruption_reason = interruption_reason
+        db_pomodoro.interruption_reason = interruption_reason  # type: ignore
 
     db.commit()
     db.refresh(db_pomodoro)
@@ -155,12 +162,13 @@ def complete_pomodoro(
 def delete_pomodoro(
     db: Session, pomodoro_id: int, user_id: int, soft_delete: bool = True
 ) -> bool:
+    """Delete a pomodoro session"""
     db_pomodoro = get_pomodoro(db, pomodoro_id, user_id)
     if not db_pomodoro:
         return False
 
     if soft_delete:
-        db_pomodoro.deleted_at = datetime.now(UTC)
+        db_pomodoro.deleted_at = datetime.now(UTC)  # type: ignore
         db.commit()
     else:
         db.delete(db_pomodoro)
@@ -171,9 +179,7 @@ def delete_pomodoro(
 def associate_task_with_pomodoro(
     db: Session, association: PomodoroTaskAssociationCreate, user_id: int
 ) -> Optional[PomodoroTaskAssociation]:
-    # Verify both pomodoro and task exist and belong to user
-    from app.db.models import Task
-
+    """Associate a task with a pomodoro session"""
     pomodoro = get_pomodoro(db, association.pomodoro_session_id, user_id)
     task = (
         db.query(Task)
@@ -219,8 +225,6 @@ def get_tasks_for_pomodoro(db: Session, pomodoro_id: int, user_id: int):
 
 def get_pomodoros_for_task(db: Session, task_id: int, user_id: int):
     """Get all pomodoro sessions associated with a task"""
-    from app.db.models import Task
-
     # First verify user has access to this task
     task = (
         db.query(Task)
@@ -313,9 +317,9 @@ def resume_pomodoro(
 
     if interruption:
         now = datetime.now(UTC)
-        interruption.resumed_at = now
+        interruption.resumed_at = now  # type: ignore
         # Calculate pause duration
-        interruption.duration = int((now - interruption.paused_at).total_seconds())
+        interruption.duration = int((now - interruption.paused_at).total_seconds())  # type: ignore
         db.commit()
         db.refresh(pomodoro)
 
