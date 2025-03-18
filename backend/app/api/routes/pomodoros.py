@@ -247,6 +247,10 @@ def create_preset_pomodoro(
     """Create a new pomodoro session with preset duration based on type and user settings"""
     # Get user settings for durations
     user_settings = users_repository.get_user_settings(db, current_user.id)
+    if not user_settings:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User settings not found"
+        )
 
     # Map session type to the appropriate duration from user settings
     duration_map = {
@@ -257,7 +261,7 @@ def create_preset_pomodoro(
 
     pomodoro = PomodoroCreate(
         start_time=datetime.now(UTC),
-        duration=duration_map[session_type],
+        duration=duration_map[session_type],  # type: ignore
         session_type=session_type,
     )
 
