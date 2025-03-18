@@ -98,6 +98,9 @@ class PomodoroSession(Base):
     task_associations = relationship(
         "PomodoroTaskAssociation", back_populates="pomodoro_session"
     )
+    interruptions = relationship(
+        "PomodoroSessionInterruption", back_populates="pomodoro_session"
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -162,3 +165,19 @@ class UserSettings(Base):
     )
 
     user = relationship("User", back_populates="settings")
+
+
+class PomodoroSessionInterruption(Base):
+    __tablename__ = "pomodoro_session_interruptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    pomodoro_session_id = Column(
+        Integer, ForeignKey("pomodoro_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    paused_at = Column(DateTime(timezone=True), nullable=False)
+    resumed_at = Column(DateTime(timezone=True))
+    duration = Column(Integer)  # Duration in seconds, calculated when resumed
+    resulted_in_reset = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    pomodoro_session = relationship("PomodoroSession", back_populates="interruptions")

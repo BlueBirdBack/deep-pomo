@@ -1,8 +1,8 @@
 """Pomodoro session routes"""
 
 from typing import List, Optional
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, UTC
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.core.auth import get_current_user
@@ -16,6 +16,7 @@ from app.schemas.pomodoros import (
 from app.db.repositories import pomodoros as pomodoros_repository
 from app.db.repositories import tasks as tasks_repository
 from app.schemas.users import User
+from app.db.repositories import users as users_repository
 
 router = APIRouter(prefix="/pomodoros", tags=["pomodoros"])
 
@@ -184,3 +185,80 @@ def get_task_pomodoros(
         )
 
     return pomodoros_repository.get_pomodoros_for_task(db, task_id, current_user.id)
+
+
+@router.post("/{pomodoro_id}/pause", response_model=PomodoroSession)
+def pause_pomodoro(
+    pomodoro_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Pause a pomodoro session"""
+    result = pomodoros_repository.pause_pomodoro(db, pomodoro_id, current_user.id)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pomodoro session not found or already completed",
+        )
+    return result
+
+
+@router.post("/{pomodoro_id}/resume", response_model=PomodoroSession)
+def resume_pomodoro(
+    pomodoro_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Resume a paused pomodoro session"""
+    result = pomodoros_repository.resume_pomodoro(db, pomodoro_id, current_user.id)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pomodoro session not found or already completed",
+        )
+    return result
+
+
+@router.get("/{pomodoro_id}/pause-stats", response_model=dict)
+def get_pomodoro_pause_stats(
+    pomodoro_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get pause statistics for a pomodoro session"""
+    # Verify pomodoro exists and belongs to user
+    pomodoro = pomodoros_repository.get_pomodoro(db, pomodoro_id, current_user.id)
+    if not pomodoro:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Pomodoro session not found"
+        )
+
+    return pomodoros_repository.get_pomodoro_pause_stats(db, pomodoro_id)
+
+
+@router.post(
+    "/preset", response_model=PomodoroSession, status_code=status.HTTP_201_CREATED
+)
+def create_preset_pomodoro(
+    session_type: str = Query(..., pattern="^(work|short_break|long_break)$"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new pomodoro session with preset duration based on type and user settings"""
+    # Get user settings for durations
+    user_settings = users_repository.get_user_settings(db, current_user.id)
+
+    # Map session type to the appropriate duration from user settings
+    duration_map = {
+        "work": user_settings.pomodoro_duration,
+        "short_break": user_settings.short_break_duration,
+        "long_break": user_settings.long_break_duration,
+    }
+
+    pomodoro = PomodoroCreate(
+        start_time=datetime.now(UTC),
+        duration=duration_map[session_type],
+        session_type=session_type,
+    )
+
+    return pomodoros_repository.create_pomodoro(db, pomodoro, current_user.id)

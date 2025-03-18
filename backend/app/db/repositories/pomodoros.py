@@ -6,7 +6,12 @@ from app.schemas.pomodoros import (
     PomodoroUpdate,
     PomodoroTaskAssociationCreate,
 )
-from app.db.models import PomodoroSession, PomodoroTaskAssociation
+from app.db.models import (
+    PomodoroSession,
+    PomodoroTaskAssociation,
+    PomodoroSessionInterruption,
+)
+from sqlalchemy.sql import text
 
 
 def create_pomodoro(
@@ -244,3 +249,91 @@ def get_pomodoros_for_task(db: Session, task_id: int, user_id: int):
         )
         .all()
     )
+
+
+def pause_pomodoro(
+    db: Session, pomodoro_id: int, user_id: int
+) -> Optional[PomodoroSession]:
+    """Pause a pomodoro session by creating an interruption record"""
+    pomodoro = get_pomodoro(db, pomodoro_id, user_id)
+    if not pomodoro:
+        return None
+
+    if pomodoro.completed:
+        return None
+
+    # Check if there's already an active pause
+    pause_stats = db.execute(
+        text("SELECT * FROM get_session_pause_stats(:session_id)"),
+        {"session_id": pomodoro_id},
+    ).fetchone()
+
+    if pause_stats and pause_stats.is_paused:
+        # Already paused, nothing to do
+        return pomodoro
+
+    # Create a new interruption record
+    interruption = PomodoroSessionInterruption(
+        pomodoro_session_id=pomodoro_id, paused_at=datetime.now(UTC)
+    )
+    db.add(interruption)
+    db.commit()
+    db.refresh(pomodoro)
+
+    return pomodoro
+
+
+def resume_pomodoro(
+    db: Session, pomodoro_id: int, user_id: int
+) -> Optional[PomodoroSession]:
+    """Resume a paused pomodoro session"""
+    pomodoro = get_pomodoro(db, pomodoro_id, user_id)
+    if not pomodoro:
+        return None
+
+    if pomodoro.completed:
+        return None
+
+    # Check if there's an active pause
+    pause_stats = db.execute(
+        text("SELECT * FROM get_session_pause_stats(:session_id)"),
+        {"session_id": pomodoro_id},
+    ).fetchone()
+
+    if not pause_stats or not pause_stats.is_paused:
+        # Not paused, nothing to do
+        return pomodoro
+
+    # Get the current pause record
+    interruption = (
+        db.query(PomodoroSessionInterruption)
+        .filter(PomodoroSessionInterruption.id == pause_stats.current_pause_id)
+        .first()
+    )
+
+    if interruption:
+        now = datetime.now(UTC)
+        interruption.resumed_at = now
+        # Calculate pause duration
+        interruption.duration = int((now - interruption.paused_at).total_seconds())
+        db.commit()
+        db.refresh(pomodoro)
+
+    return pomodoro
+
+
+def get_pomodoro_pause_stats(db: Session, pomodoro_id: int) -> dict:
+    """Get pause statistics for a pomodoro session"""
+    stats = db.execute(
+        text("SELECT * FROM get_session_pause_stats(:session_id)"),
+        {"session_id": pomodoro_id},
+    ).fetchone()
+
+    if not stats:
+        return {"is_paused": False, "current_pause_id": None, "total_pause_duration": 0}
+
+    return {
+        "is_paused": stats.is_paused,
+        "current_pause_id": stats.current_pause_id,
+        "total_pause_duration": stats.total_pause_duration,
+    }

@@ -52,3 +52,23 @@ class PomodoroTaskAssociation(PomodoroTaskAssociationBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PomodoroInterruptionBase(BaseModel):
+    pomodoro_session_id: int
+    paused_at: datetime
+    resumed_at: Optional[datetime] = None
+    duration: Optional[int] = None
+    resulted_in_reset: bool = False
+
+
+class PomodoroInterruption(PomodoroInterruptionBase):
+    id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PomodoroWithPauseStats(PomodoroSession):
+    is_paused: bool = False
+    total_pause_duration: int = 0
